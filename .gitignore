@@ -1,2 +1,20 @@
+ShopMobileApp/node_modules/
+ShopMobileApp/.expo/
+ShopMobileApp/dist/
+ShopMobileApp/npm-debug.*
+ShopMobileApp/*.jks
+ShopMobileApp/*.p8
+ShopMobileApp/*.p12
+ShopMobileApp/*.key
+ShopMobileApp/*.mobileprovision
+ShopMobileApp/*.orig.*
+ShopMobileApp/web-build/
 myenv
-.env
+backendApp/.env
+backendApp/__pycache__
+
+# macOS
+.DS_Store
+
+# Temporary files created by Metro to check the health of the file watcher
+ShopMobileApp/.metro-health-check*
