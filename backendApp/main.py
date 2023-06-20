@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request
 from models import db, Product
 from config import config
-
+from auth0 import login, logout,get_user
+from flask import Flask
 app = Flask(__name__)
 
 # Configuration de l'application Flask
@@ -12,6 +13,21 @@ db.init_app(app)
 # Création des tables
 with app.app_context():
     db.create_all()
+
+#Route de connexion à l'application
+@app.route('/login')
+def login_route():
+    return login()
+
+#Route de deconnexion à l'application
+@app.route("/logout")
+def logout():
+    return logout()
+
+@app.route("/auth_user")
+def get_auth_user():
+    return get_user()
+   
 
 # Route pour récupérer tous les produits
 @app.route('/api/products', methods=['GET'])
