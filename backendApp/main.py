@@ -1,33 +1,74 @@
-from flask import Flask, jsonify, request
+import os
+from os import environ as env
+from urllib.parse import quote_plus, urlencode
+from authlib.integrations.flask_client import OAuth
+from dotenv import find_dotenv, load_dotenv
+from flask import Flask, redirect, session, jsonify, url_for,request
+from flask_cors import CORS
 from models import db, Product
 from config import config
-from auth0 import login, logout,get_user
-from flask import Flask
+
 app = Flask(__name__)
-
-# Configuration de l'application Flask
-env = 'development'  # Mettez ici votre environnement ('development' ou 'production')
-app.config.from_object(config[env])
+env_type='development'
+app.config.from_object(config[env_type])
 db.init_app(app)
-
 # Création des tables
 with app.app_context():
     db.create_all()
+CORS(app)  # Pour autoriser les requêtes CORS
+secret_key = os.urandom(24).hex()
+ENV_FILE = find_dotenv()
+if ENV_FILE:
+    load_dotenv(ENV_FILE)
 
-#Route de connexion à l'application
-@app.route('/login')
-def login_route():
-    return login()
+app.secret_key = secret_key
 
-#Route de deconnexion à l'application
+## GESTION DE L'AUTHENTICATION 
+oauth = OAuth(app)
+
+oauth.register(
+    "auth0",
+    client_id=env.get("AUTH0_CLIENT_ID"),
+    client_secret=env.get("AUTH0_CLIENT_SECRET"),
+    client_kwargs={
+        "scope": "openid profile email",
+    },
+    server_metadata_url=f'https://{env.get("AUTH0_DOMAIN")}/.well-known/openid-configuration'
+)
+
+@app.route("/login")
+def login():
+    return oauth.auth0.authorize_redirect(
+        redirect_uri=url_for("get_user_infos", _external=True)  # Remplacez par votre URL de redirection
+    )
+
 @app.route("/logout")
 def logout():
-    return logout()
+    session.clear()
+    return redirect(
+        "https://" + env.get("AUTH0_DOMAIN")
+        + "/v2/logout?"
+        + urlencode(
+            {
+                "returnTo": "http://localhost:5000",  # Remplacez par votre URL de redirection après la déconnexion
+                "client_id": env.get("AUTH0_CLIENT_ID"),
+            },
+            quote_via=quote_plus,
+        )
+    )
 
-@app.route("/auth_user")
-def get_auth_user():
-    return get_user()
-   
+@app.route("/is_user_authenticated")
+def get_user_infos():
+    token = oauth.auth0.authorize_access_token()
+    session["user"] = token
+    user = session.get("user")
+    if user:
+        return jsonify(user)
+    else:
+        return jsonify({"message": "User not authenticated"})
+
+
+## GESTION DES UTILISATEUR
 
 # Route pour récupérer tous les produits
 @app.route('/api/products', methods=['GET'])
@@ -78,7 +119,7 @@ def update_product(product_id):
 
     return jsonify({'message': 'Le produit a été mis à jour avec succès'})
 
-# Route pour supprimer un produit
+# Route pour supprikmer un produit
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
     product = Product.query.get(product_id)
@@ -90,6 +131,5 @@ def delete_product(product_id):
 
     return jsonify({'message': 'Le produit a été supprimé avec succès'})
 
-if __name__ == '__main__':
-    app.run()
-
+if __name__ == "__main__":
+    app.run(host="localhost", port=5000)
