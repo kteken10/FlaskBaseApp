@@ -9,19 +9,21 @@ from models import db, Product
 from config import config
 
 app = Flask(__name__)
-env_type='development'
+env_type = 'development'
+secret_key = os.urandom(24).hex()
+app.secret_key = secret_key
 app.config.from_object(config[env_type])
 db.init_app(app)
 # Création des tables
 with app.app_context():
     db.create_all()
 CORS(app)  # Pour autoriser les requêtes CORS
-secret_key = os.urandom(24).hex()
+
 ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
 
-app.secret_key = secret_key
+
 
 ## GESTION DE L'AUTHENTICATION 
 oauth = OAuth(app)
@@ -57,7 +59,7 @@ def logout():
         )
     )
 
-@app.route("/is_user_authenticated")
+@app.route("/users")
 def get_user_infos():
     token = oauth.auth0.authorize_access_token()
     session["user"] = token
