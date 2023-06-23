@@ -42,9 +42,15 @@ oauth.register(
 @app.route("/login")
 def login():
     return oauth.auth0.authorize_redirect(
-        redirect_uri=url_for("get_user_infos", _external=True)  # Remplacez par votre URL de redirection
+        redirect_uri=url_for("get_user_info", _external=True)  # Remplacez par votre URL de redirection
     )
 
+
+@app.route("/users")
+def get_user_info():
+    token = oauth.auth0.authorize_access_token()
+    session["user"] = token
+    return jsonify(session)
 @app.route("/logout")
 def logout():
     session.clear()
