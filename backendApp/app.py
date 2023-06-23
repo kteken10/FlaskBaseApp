@@ -46,11 +46,20 @@ def login():
     )
 
 
+
 @app.route("/users")
 def get_user_info():
+    # Vérifier si l'authentification a réussi
     token = oauth.auth0.authorize_access_token()
-    session["user"] = token
-    return jsonify(session)
+    if token:
+        # Authentification réussie
+        userinfo = oauth.auth0.parse_id_token(token, nonce=request.args.get('nonce'))
+        # Vous pouvez accéder aux informations de l'utilisateur à partir de userinfo, par exemple :
+       
+        return jsonify({'message': 'Authentification réussie', 'userinfo':userinfo})
+    else:
+        # Authentification échouée
+        return jsonify({'message': 'Échec de l\'authentification'})
 @app.route("/logout")
 def logout():
     session.clear()
