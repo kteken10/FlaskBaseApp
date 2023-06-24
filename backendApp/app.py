@@ -116,7 +116,7 @@ def create_visiteur():
         email=data['email'],
         numero_telephone=data['numero_telephone'],
         photo_profil=data['photo_profil'],
-        date_enregistrement=data['date_enregistrement']
+        
     )
     db.session.add(visiteur)
     db.session.commit()
@@ -167,7 +167,6 @@ def create_fournisseur():
         email=data['email'],
         numero_telephone=data['numero_telephone'],
         logo_fournisseur=data['logo_fournisseur'],
-        date_enregistrement=data['date_enregistrement'],
         localisation=data['localisation'],
         adresse=data['adresse']
     )
