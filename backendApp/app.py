@@ -3,11 +3,12 @@ from os import environ as env
 from urllib.parse import quote_plus, urlencode
 from authlib.integrations.flask_client import OAuth
 from dotenv import find_dotenv, load_dotenv
+from flask import Flask, redirect, session, jsonify, url_for, request
 from flask_migrate import Migrate
-from flask import Flask, redirect, session, jsonify, url_for,request
 from flask_cors import CORS
-from models import db, Visiteur, Fournisseur, Automobile, AutomobileImage
+from models import db, Visiteur, Fournisseur, Automobile
 from config import config
+from datetime import datetime
 
 app = Flask(__name__)
 env_type = 'development'
@@ -15,18 +16,19 @@ secret_key = os.urandom(24).hex()
 app.secret_key = secret_key
 app.config.from_object(config[env_type])
 db.init_app(app)
+migrate = Migrate(app, db)
+
 # Création des tables
 with app.app_context():
     db.create_all()
+
 CORS(app)  # Pour autoriser les requêtes CORS
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
 
-
-
-## GESTION DE L'AUTHENTICATION 
+## GESTION DE L'AUTHENTICATION
 oauth = OAuth(app)
 
 oauth.register(
@@ -45,8 +47,6 @@ def login():
         redirect_uri=url_for("get_user_info", _external=True)  # Remplacez par votre URL de redirection
     )
 
-
-
 @app.route("/users")
 def get_user_info():
     # Vérifier si l'authentification a réussi
@@ -55,11 +55,11 @@ def get_user_info():
         # Authentification réussie
         userinfo = oauth.auth0.parse_id_token(token, nonce=request.args.get('nonce'))
         # Vous pouvez accéder aux informations de l'utilisateur à partir de userinfo, par exemple :
-       
-        return jsonify({'message': 'Authentification réussie', 'userinfo':userinfo})
+        return jsonify({'message': 'Authentification réussie', 'userinfo': userinfo})
     else:
         # Authentification échouée
         return jsonify({'message': 'Échec de l\'authentification'})
+
 @app.route("/logout")
 def logout():
     session.clear()
@@ -116,11 +116,19 @@ def create_visiteur():
         email=data['email'],
         numero_telephone=data['numero_telephone'],
         photo_profil=data['photo_profil'],
-        
+        date_enregistrement=datetime.utcnow()
     )
     db.session.add(visiteur)
     db.session.commit()
     return jsonify({'message': 'Visiteur créé avec succès'})
+
+@app.route('/visiteurs', methods=['DELETE'])
+def delete_all_visiteurs():
+    # Supprimer tous les enregistrements de visiteurs de la base de données
+    db.session.query(Visiteur).delete()
+    db.session.commit()
+    
+    return jsonify({'message': 'Tous les visiteurs ont été supprimés avec succès'})
 
 # Routes pour les fournisseurs
 @app.route('/fournisseurs', methods=['GET'])
@@ -167,6 +175,7 @@ def create_fournisseur():
         email=data['email'],
         numero_telephone=data['numero_telephone'],
         logo_fournisseur=data['logo_fournisseur'],
+        date_enregistrement=datetime.utcnow(),
         localisation=data['localisation'],
         adresse=data['adresse']
     )
@@ -174,10 +183,19 @@ def create_fournisseur():
     db.session.commit()
     return jsonify({'message': 'Fournisseur créé avec succès'})
 
+@app.route('/fournisseurs', methods=['DELETE'])
+def delete_all_fournisseurs():
+    # Supprimer tous les enregistrements de fournisseurs de la base de données
+    db.session.query(Fournisseur).delete()
+    db.session.commit()
+    
+    return jsonify({'message': 'Tous les fournisseurs ont été supprimés avec succès'})
+
 # Routes pour les automobiles
 @app.route('/automobiles', methods=['GET'])
 def get_automobiles():
     automobiles = Automobile.query.all()
+
     result = [
         {
             'id': automobile.id,
@@ -185,12 +203,19 @@ def get_automobiles():
             'prix': float(automobile.prix),
             'type_vehicule': automobile.type_vehicule,
             'couleur': automobile.couleur,
-            'date_enregistrement': automobile.date_enregistrement.isoformat(),
-            'fournisseur_id': automobile.fournisseur_id
+            'duree': get_duration(automobile.date_enregistrement),
+            'fournisseur_id': automobile.fournisseur_id,
+            'image': automobile.image
         }
         for automobile in automobiles
     ]
     return jsonify(result)
+
+
+def get_duration(date_enregistrement):
+    delta = datetime.now() - date_enregistrement
+    duration = f"{delta.days} jours, {delta.seconds // 3600} heures, {(delta.seconds // 60) % 60} minutes"
+    return duration
 
 @app.route('/automobiles/<int:automobile_id>', methods=['GET'])
 def get_automobile(automobile_id):
@@ -202,8 +227,9 @@ def get_automobile(automobile_id):
             'prix': float(automobile.prix),
             'type_vehicule': automobile.type_vehicule,
             'couleur': automobile.couleur,
-            'date_enregistrement': automobile.date_enregistrement.isoformat(),
-            'fournisseur_id': automobile.fournisseur_id
+            'duree': (datetime.now().date() - automobile.date_enregistrement.date()).days,
+            'fournisseur_id': automobile.fournisseur_id,
+            'image': automobile.image
         }
         return jsonify(result)
     else:
@@ -212,54 +238,70 @@ def get_automobile(automobile_id):
 @app.route('/automobiles', methods=['POST'])
 def create_automobile():
     data = request.json
+
+    # Créer une nouvelle instance de l'automobile
     automobile = Automobile(
         marque=data['marque'],
         prix=data['prix'],
         type_vehicule=data['type_vehicule'],
         couleur=data['couleur'],
-        fournisseur_id=data['fournisseur_id']
+        date_enregistrement=datetime.utcnow(),
+        fournisseur_id=data['fournisseur_id'],
+        image=data['image']
     )
+
+    # Enregistrer l'automobile et ses images dans la base de données
     db.session.add(automobile)
     db.session.commit()
+
     return jsonify({'message': 'Automobile créée avec succès'})
 
-# Routes pour les images d'automobile
-@app.route('/images', methods=['GET'])
-def get_images():
-    images = AutomobileImage.query.all()
-    result = [
-        {
-            'id': image.id,
-            'url_image': image.url_image,
-            'automobile_id': image.automobile_id
-        }
-        for image in images
-    ]
-    return jsonify(result)
-
-@app.route('/images/<int:image_id>', methods=['GET'])
-def get_image(image_id):
-    image = AutomobileImage.query.get(image_id)
-    if image:
-        result = {
-            'id': image.id,
-            'url_image': image.url_image,
-            'automobile_id': image.automobile_id
-        }
-        return jsonify(result)
-    else:
-        return jsonify({'message': 'Image non trouvée'})
-
-@app.route('/images', methods=['POST'])
-def create_image():
-    data = request.json
-    image = AutomobileImage(
-        url_image=data['url_image'],
-        automobile_id=data['automobile_id']
-    )
-    db.session.add(image)
+@app.route('/automobiles', methods=['DELETE'])
+def delete_all_automobiles():
+    # Supprimer tous les enregistrements d'automobiles de la base de données
+    db.session.query(Automobile).delete()
     db.session.commit()
-    return jsonify({'message': 'Image créée avec succès'})
+    
+    return jsonify({'message': 'Tous les automobiles ont été supprimés avec succès'})
+
+@app.route('/recherche', methods=['GET'])
+def recherche():
+    # Récupérer les critères de recherche de la requête
+    type_vehicule = request.args.get('type_vehicule')
+    marque = request.args.get('marque')
+    couleur = request.args.get('couleur')
+    fournisseur = request.args.get('fournisseur')
+
+    # Construire la requête de recherche
+    query = db.session.query(Automobile)
+
+    if type_vehicule:
+        query = query.filter(Automobile.type_vehicule == type_vehicule)
+    if marque:
+        query = query.filter(Automobile.marque == marque)
+    if couleur:
+        query = query.filter(Automobile.couleur == couleur)
+    if fournisseur:
+        query = query.join(Automobile.fournisseur).filter(Fournisseur.nom_fournisseur == fournisseur)
+
+    # Exécuter la requête
+    result = query.all()
+
+    # Formatter les résultats en JSON
+    automobiles = []
+    for automobile in result:
+        automobiles.append({
+            'id': automobile.id,
+            'marque': automobile.marque,
+            'prix': str(automobile.prix),
+            'type_vehicule': automobile.type_vehicule,
+            'couleur': automobile.couleur,
+            'fournisseur': automobile.fournisseur.nom_fournisseur,
+            'image': automobile.image
+        })
+
+    return jsonify(automobiles)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

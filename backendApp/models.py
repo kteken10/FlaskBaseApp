@@ -30,9 +30,5 @@ class Automobile(db.Model):
     date_enregistrement = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     fournisseur_id = db.Column(db.Integer, db.ForeignKey('fournisseur.id'))
     fournisseur = db.relationship('Fournisseur', backref=db.backref('automobiles', lazy=True))
+    image = db.Column(db.String(255), nullable=False)
 
-class AutomobileImage(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    url_image = db.Column(db.String(255), nullable=False)
-    automobile_id = db.Column(db.Integer, db.ForeignKey('automobile.id'))
-    automobile = db.relationship('Automobile', backref=db.backref('images', lazy=True))

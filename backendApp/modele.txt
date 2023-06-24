@@ -28,8 +28,3 @@ Table Automobile {
   fournisseur_id       int           [ref: > Fournisseur.id]
 }
 
-Table AutomobileImage {
-  id                   int           [pk, increment]
-  url_image            varchar       [not null]
-  automobile_id        int           [ref: > Automobile.id]
-}
